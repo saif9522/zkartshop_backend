@@ -1,8 +1,9 @@
+import os
 import json
 import logging
-
-import requests
 from django.conf import settings
+from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
 
@@ -126,53 +127,35 @@ class ChatbotUnavailable(Exception):
 def get_chat_reply(user, message_history):
     """
     message_history: list of {"role": "user"|"assistant", "content": str}
-    (the new user message should already be the last entry).
-    Returns the assistant's final text reply after resolving any tool calls.
+    Returns the assistant's final text reply using Gemini.
     """
-    if not settings.ANTHROPIC_API_KEY:
-        raise ChatbotUnavailable("AI chatbot is not configured (ANTHROPIC_API_KEY not set).")
+    api_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", None)
+    if not api_key:
+        raise ChatbotUnavailable("AI chatbot is not configured (GEMINI_API_KEY not set).")
 
-    messages = [{"role": m["role"], "content": m["content"]} for m in message_history]
-    headers = {
-        "x-api-key": settings.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-    }
+    client = genai.Client(api_key=api_key)
 
-    # Bounded loop — a well-behaved conversation resolves in 1-3 tool round-trips;
-    # this just guards against an unexpected infinite tool-call loop.
-    for _ in range(5):
-        response = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers=headers,
-            json={
-                "model": settings.ANTHROPIC_MODEL,
-                "max_tokens": 500,
-                "system": SYSTEM_PROMPT,
-                "tools": TOOLS,
-                "messages": messages,
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        data = response.json()
-
-        if data.get("stop_reason") != "tool_use":
-            return "".join(block["text"] for block in data["content"] if block["type"] == "text").strip()
-
-        messages.append({"role": "assistant", "content": data["content"]})
-        tool_results = []
-        for block in data["content"]:
-            if block["type"] != "tool_use":
-                continue
-            try:
-                result = _execute_tool(block["name"], block.get("input", {}), user)
-            except Exception as exc:
-                logger.exception("Chatbot tool %s failed", block["name"])
-                result = {"error": str(exc)}
-            tool_results.append(
-                {"type": "tool_result", "tool_use_id": block["id"], "content": json.dumps(result)}
+    # Format message history for Gemini
+    contents = []
+    for m in message_history:
+        role = "user" if m["role"] == "user" else "model"
+        contents.append(
+            types.Content(
+                role=role,
+                parts=[types.Part.from_text(text=str(m["content"]))]
             )
-        messages.append({"role": "user", "content": tool_results})
+        )
 
-    return "Sorry, I'm having trouble with that request right now — please try rephrasing, or contact support."
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                max_output_tokens=500,
+            ),
+        )
+        return response.text
+    except Exception as exc:
+        logger.exception("Gemini chatbot request failed")
+        raise ChatbotUnavailable(f"Gemini error: {str(exc)}")
