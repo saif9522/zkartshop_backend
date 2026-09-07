@@ -1,0 +1,39 @@
+# Requires Python 3.14.5 (see .python-version)
+requests>=2.32.5
+razorpay>=2.0.0
+daphne>=4.2.1
+openpyxl>=3.1.5
+Django>=5.2,<6.0
+djangorestframework>=3.16.1
+djangorestframework-simplejwt>=5.5.1
+django-cors-headers>=4.9.0
+python-decouple>=3.8
+django-filter>=25.1
+Pillow>=11.3.0
+channels>=4.3.1
+channels-redis>=4.3.0
+redis>=6.4.0
+celery>=5.5.3
+django-storages>=1.14.6
+boto3>=1.40.0
+django-phonenumber-field>=8.1.0
+phonenumbers>=9.0.12
+drf-yasg>=1.21.11
+google-auth>=2.35.0
+pywebpush>=2.3.0
+cryptography>=42.0.0
+beautifulsoup4>=4.12.0
+whitenoise>=6.6.0
+
+# PostgreSQL driver — used when DB_ENGINE=postgresql (the Docker/production default).
+# SQLite (DB_ENGINE unset or =sqlite3) needs no driver — it's built into Python.
+psycopg[binary]>=3.2.9
+
+# Only needed if you switch to MySQL/MariaDB (DB_ENGINE=mysql in .env).
+mysqlclient>=2.2.7
+# Testing (Phase 27)
+pytest>=8.3.0
+pytest-django>=4.9.0
+pytest-cov>=6.0.0
+factory-boy>=3.3.1
+reportlab>=4.0
