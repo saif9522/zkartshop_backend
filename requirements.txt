@@ -24,6 +24,7 @@ pywebpush>=2.3.0
 cryptography>=42.0.0
 beautifulsoup4>=4.12.0
 whitenoise>=6.6.0
+google-genai>=1.0.0
 
 # PostgreSQL driver — used when DB_ENGINE=postgresql (the Docker/production default).
 # SQLite (DB_ENGINE unset or =sqlite3) needs no driver — it's built into Python.
