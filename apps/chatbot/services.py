@@ -19,7 +19,7 @@ class ChatbotUnavailable(Exception):
 
 def get_chat_reply(user, message_history):
     """
-    Crash-proof direct chat reply without complex tool loops to prevent 503 errors.
+    Super-safe chat handler that prevents 503 errors during long conversations.
     """
     api_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", None)
     if not api_key:
@@ -28,11 +28,15 @@ def get_chat_reply(user, message_history):
     try:
         client = genai.Client(api_key=api_key)
 
-        # Format message history safely for Gemini
+        # Safely sanitize and limit history to the last 10 messages to avoid payload crashes
+        recent_history = message_history[-10:] if message_history else []
+        
         contents = []
-        for m in message_history:
-            role = "user" if m.get("role") == "user" else "model"
-            content_text = str(m.get("content", ""))
+        for m in recent_history:
+            raw_role = str(m.get("role", "user")).lower()
+            role = "model" if raw_role in ["assistant", "model", "bot"] else "user"
+            
+            content_text = str(m.get("content", "")).strip()
             if content_text:
                 contents.append(
                     types.Content(
@@ -41,18 +45,27 @@ def get_chat_reply(user, message_history):
                     )
                 )
 
+        # Fallback if history is completely empty
+        if not contents:
+            contents.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text="Hello")]
+                )
+            )
+
         response = client.models.generate_content(
             model="gemini-3.6-flash",
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
                 max_output_tokens=400,
-                temperature=0.7,
+                temperature=0.3,
             ),
         )
         
-        return response.text if response.text else "Jee, main aapki kya madad kar sakta hoon?"
+        return response.text if response and response.text else "Jee, main aapki kya madad kar sakta hoon?"
 
     except Exception as exc:
-        logger.exception("Gemini chatbot request failed safely")
+        logger.exception("Gemini chatbot request failed safely during ongoing chat")
         raise ChatbotUnavailable(f"Gemini error: {str(exc)}")
