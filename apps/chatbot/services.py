@@ -19,7 +19,7 @@ class ChatbotUnavailable(Exception):
 
 def get_chat_reply(user, message_history):
     """
-    Super-safe chat handler that prevents 503 errors during long conversations.
+    Chat handler using gemini-3.6-flash safely without unsupported parameters.
     """
     api_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", None)
     if not api_key:
@@ -28,7 +28,6 @@ def get_chat_reply(user, message_history):
     try:
         client = genai.Client(api_key=api_key)
 
-        # Safely sanitize and limit history to the last 10 messages to avoid payload crashes
         recent_history = message_history[-10:] if message_history else []
         
         contents = []
@@ -45,7 +44,6 @@ def get_chat_reply(user, message_history):
                     )
                 )
 
-        # Fallback if history is completely empty
         if not contents:
             contents.append(
                 types.Content(
@@ -60,12 +58,11 @@ def get_chat_reply(user, message_history):
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
                 max_output_tokens=400,
-                temperature=0.3,
             ),
         )
         
         return response.text if response and response.text else "Jee, main aapki kya madad kar sakta hoon?"
 
     except Exception as exc:
-        logger.exception("Gemini chatbot request failed safely during ongoing chat")
+        logger.exception("Gemini chatbot request failed safely")
         raise ChatbotUnavailable(f"Gemini error: {str(exc)}")
